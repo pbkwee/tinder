@@ -93,10 +93,20 @@ module Tinder
       send_message(sound, 'SoundMessage')
     end
 
-    # Get the list of users currently chatting for this room
-    def users
+    # Get the map of users (by id) currently chatting for this room
+    def users(id)
       reload!
       @users
+    end
+
+    # Get a user (by id)
+    def user(id)
+      u = @users[id]
+      if u.nil?
+        reload!
+        u = @users[id]
+      end
+      return u
     end
 
     # Get and array of the messages that have been posted to the room. Each
@@ -117,15 +127,17 @@ module Tinder
     #     room.speak "#{m[:person]}, Go away!" if m[:message] =~ /Java/i
     #   end
     #
-    def listen(interval = 5)
+    def listen
       require 'yajl/http_stream'
 
       auth = connection.default_options[:basic_auth]
       url = URI.parse("http://#{auth[:username]}:#{auth[:password]}@streaming.#{Campfire::HOST}/room/#{@id}/live.json")
       Yajl::HttpStream.get(url) do |message|
-        { :id => message['id'],
+        obj = { :id => message['id'],
           :user_id => message['user_id'],
+          :type => message['type'],
           :message => message['body'] }
+        yield obj
       end
     end
 
@@ -179,14 +191,18 @@ module Tinder
         @name = attributes['name']
         @topic = attributes['topic']
         @full = attributes['full']
-        @open_to_guests = attributes['open-to-guests']
-        @active_token_value = attributes['active-token-value']
-        @users = attributes['users'].map { |u| u['name'] }
+        @open_to_guests = attributes['open_to_guests']
+        @active_token_value = attributes['active_token_value']
+        @users ={}
+        attributes['users'].map do |u|
+          @users[u['id']] = u;
+        end
+
 
         @loaded = true
       end
 
-      def send_message(message, type = 'Textmessage')
+      def send_message(message, type = 'TextMessage')
         post 'speak', :body => {:message => {:body => message, :type => type}}.to_json
       end
 
