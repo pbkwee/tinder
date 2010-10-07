@@ -87,23 +87,6 @@ module Tinder
       @users
     end
 
-<<<<<<< HEAD
-    # Get a user (by id)
-    def user(id)
-      u = @users[id]
-      if u.nil?
-        reload!
-        u = @users[id]
-      end
-      return u
-    end
-
-    # Get and array of the messages that have been posted to the room. Each
-    # messages is a hash with:
-    # * +:person+: the display name of the person that posted the message
-    # * +:message+: the body of the message
-    # * +:user_id+: Campfire user id
-=======
     # return the user with the given id; if it isn't in our room cache, do a request to get it
     def user(id)
       if id
@@ -127,7 +110,6 @@ module Tinder
     #   * +:admin+: Boolean admin flag
     #   * +:created_at+: User creation timestamp
     #   * +:type+: User type (e.g. Member)
->>>>>>> a0e99d64c9339329cf27178a9d1c1b02485c9356
     # * +:id+: Campfire message id
     # * +:type+: Campfire message type
     # * +:room_id+: Campfire room id
@@ -136,20 +118,6 @@ module Tinder
     #   room.listen do |m|
     #     room.speak "Go away!" if m[:body] =~ /Java/i
     #   end
-<<<<<<< HEAD
-    #
-    def listen
-      require 'yajl/http_stream'
-
-      auth = connection.default_options[:basic_auth]
-      url = URI.parse("http://#{auth[:username]}:#{auth[:password]}@streaming.#{Campfire::HOST}/room/#{@id}/live.json")
-      Yajl::HttpStream.get(url) do |message|
-        obj = { :id => message['id'],
-          :user_id => message['user_id'],
-          :type => message['type'],
-          :message => message['body'] }
-        yield obj
-=======
     def listen(options = {})
       raise ArgumentError, "no block provided" unless block_given?
 
@@ -175,7 +143,6 @@ module Tinder
         end
         # if we really get disconnected
         raise ListenFailed.new("got disconnected from #{@name}!") if !EventMachine.reactor_running?
->>>>>>> a0e99d64c9339329cf27178a9d1c1b02485c9356
       end
     end
 
@@ -237,15 +204,7 @@ module Tinder
         @full = attributes['full']
         @open_to_guests = attributes['open_to_guests']
         @active_token_value = attributes['active_token_value']
-<<<<<<< HEAD
-        @users ={}
-        attributes['users'].map do |u|
-          @users[u['id']] = u;
-        end
-
-=======
         @users = attributes['users']
->>>>>>> a0e99d64c9339329cf27178a9d1c1b02485c9356
 
         @loaded = true
       end
