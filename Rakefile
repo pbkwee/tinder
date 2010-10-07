@@ -2,8 +2,8 @@ begin
   require 'jeweler'
   Jeweler::Tasks.new do |gem|
     gem.name = "tinder"
-    gem.summary = "An (unofficial) Campfire API"
-    gem.description = "An API for interfacing with Campfire, the 37Signals chat application."
+    gem.summary = "Ruby wrapper for the Campfire API"
+    gem.description = "A Ruby API for interfacing with Campfire, the 37Signals chat application."
     gem.authors = ['Brandon Keepers']
     gem.email = 'brandon@opensoul.org'
     gem.homepage = 'http://github.com/collectiveidea/tinder'
@@ -11,34 +11,15 @@ begin
     gem.add_dependency "activesupport"
     gem.add_dependency "httparty"
     gem.add_dependency "mime-types"
+    gem.add_dependency "twitter-stream"
+    gem.add_dependency "eventmachine"
     gem.add_development_dependency "rspec"
+    gem.add_development_dependency "fakeweb"
   end
   Jeweler::GemcutterTasks.new
 rescue LoadError
   puts "Jeweler (or a dependency) not available. Install it with: sudo gem install jeweler"
 end
-
-require 'rake/testtask'
-Rake::TestTask.new(:test) do |test|
-  test.libs << 'lib' << 'test'
-  test.pattern = 'test/**/*_test.rb'
-  test.verbose = true
-end
-
-begin
-  require 'rcov/rcovtask'
-  Rcov::RcovTask.new do |test|
-    test.libs << 'test'
-    test.pattern = 'test/**/*_test.rb'
-    test.verbose = true
-  end
-rescue LoadError
-  task :rcov do
-    abort "RCov is not available. In order to run rcov, you must: sudo gem install spicycode-rcov"
-  end
-end
-
-task :test => :check_dependencies
 
 require 'rake/rdoctask'
 Rake::RDocTask.new do |rdoc|
@@ -60,6 +41,11 @@ Spec::Rake::SpecTask.new do |t|
   t.spec_opts = ['--options', "spec/spec.opts"]
   t.spec_files = FileList['spec/**/*_spec.rb']
 end
+task :spec => :check_dependencies
 
-desc "Run tests"
-task :default => [:spec, :test]
+task :default do
+  %w(2.3.5 3.0.0.beta3).each do |version|
+    puts "Running specs with Rails #{version}"
+    system("RAILS_VERSION=#{version} rake -s spec;")
+  end
+end

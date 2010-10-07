@@ -3,8 +3,8 @@ module Tinder
   class Room
     attr_reader :id, :name
 
-    def initialize(campfire, attributes = {})
-      @campfire = campfire
+    def initialize(connection, attributes = {})
+      @connection = connection
       @id = attributes['id']
       @name = attributes['name']
       @loaded = false
@@ -18,20 +18,12 @@ module Tinder
     # Leave a room
     def leave
       post 'leave'
-    end
-
-    # Toggle guest access on or off
-    def toggle_guest_access
-      raise NotImplementedError
+      stop_listening
     end
 
     # Get the url for guest access
     def guest_url
-      if guest_access_enabled?
-        "http://#{@campfire.subdomain}.campfirenow.com/#{guest_invite_code}"
-      else
-        nil
-      end
+      "#{@connection.uri}/#{guest_invite_code}" if guest_access_enabled?
     end
 
     def guest_access_enabled?
@@ -47,13 +39,17 @@ module Tinder
 
     # Change the name of the room
     def name=(name)
-      connection.post("/room/#{@id}.json", :body => { :room => { :name => name } })
+      update :name => name
     end
     alias_method :rename, :name=
 
     # Change the topic
     def topic=(topic)
-      connection.post("/room/#{@id}.json", :body => { :room => { :topic => name } })
+      update :topic => topic
+    end
+
+    def update(attrs)
+      connection.put("/room/#{@id}.json", :body => {:room => attrs}.to_json)
     end
 
     # Get the current topic
@@ -70,14 +66,6 @@ module Tinder
     # Unlock the room
     def unlock
       post :unlock
-    end
-
-    def ping(force = false)
-      raise NotImplementedError
-    end
-
-    def destroy
-      raise NotImplementedError
     end
 
     # Post a new message to the chat room
@@ -99,6 +87,7 @@ module Tinder
       @users
     end
 
+<<<<<<< HEAD
     # Get a user (by id)
     def user(id)
       u = @users[id]
@@ -114,18 +103,40 @@ module Tinder
     # * +:person+: the display name of the person that posted the message
     # * +:message+: the body of the message
     # * +:user_id+: Campfire user id
+=======
+    # return the user with the given id; if it isn't in our room cache, do a request to get it
+    def user(id)
+      if id
+        user = users.detect {|u| u[:id] == id }
+        unless user
+          user_data = connection.get("/users/#{id}.json")
+          user = user_data && user_data[:user]
+        end
+        user[:created_at] = Time.parse(user[:created_at])
+        user
+      end
+    end
+
+    # Listen for new messages in the room, yielding them to the provided block as they arrive.
+    # Each message is a hash with:
+    # * +:body+: the body of the message
+    # * +:user+: Campfire user, which is itself a hash, of:
+    #   * +:id+: User id
+    #   * +:name+: User name
+    #   * +:email_address+: Email address
+    #   * +:admin+: Boolean admin flag
+    #   * +:created_at+: User creation timestamp
+    #   * +:type+: User type (e.g. Member)
+>>>>>>> a0e99d64c9339329cf27178a9d1c1b02485c9356
     # * +:id+: Campfire message id
-    #
-    #   room.listen
-    #   #=> [{:person=>"Brandon", :message=>"I'm getting very sleepy", :user_id=>"148583", :id=>"16434003"}]
-    #
-    # Called without a block, listen will return an array of messages that have been
-    # posted since you joined. listen also takes an optional block, which then polls
-    # for new messages every 5 seconds and calls the block for each message.
+    # * +:type+: Campfire message type
+    # * +:room_id+: Campfire room id
+    # * +:created_at+: Message creation timestamp
     #
     #   room.listen do |m|
-    #     room.speak "#{m[:person]}, Go away!" if m[:message] =~ /Java/i
+    #     room.speak "Go away!" if m[:body] =~ /Java/i
     #   end
+<<<<<<< HEAD
     #
     def listen
       require 'yajl/http_stream'
@@ -138,12 +149,45 @@ module Tinder
           :type => message['type'],
           :message => message['body'] }
         yield obj
+=======
+    def listen(options = {})
+      raise ArgumentError, "no block provided" unless block_given?
+
+      join # you have to be in the room to listen
+
+      require 'twitter/json_stream'
+
+      auth = connection.default_options[:basic_auth]
+      options = {
+        :host => "streaming.#{Connection::HOST}",
+        :path => room_url_for(:live),
+        :auth => "#{auth[:username]}:#{auth[:password]}",
+        :timeout => 6,
+        :ssl => connection.options[:ssl]
+      }.merge(options)
+      EventMachine::run do
+        @stream = Twitter::JSONStream.connect(options)
+        @stream.each_item do |message|
+          message = HashWithIndifferentAccess.new(JSON.parse(message))
+          message[:user] = user(message.delete(:user_id))
+          message[:created_at] = Time.parse(message[:created_at])
+          yield(message)
+        end
+        # if we really get disconnected
+        raise ListenFailed.new("got disconnected from #{@name}!") if !EventMachine.reactor_running?
+>>>>>>> a0e99d64c9339329cf27178a9d1c1b02485c9356
       end
     end
 
-    # Get the dates for the available transcripts for this room
-    def available_transcripts
-      raise NotImplementedError
+    def listening?
+      @stream != nil
+    end
+
+    def stop_listening
+      return unless listening?
+
+      @stream.stop
+      @stream = nil
     end
 
     # Get the transcript for the given date (Returns a hash in the same format as #listen)
@@ -170,13 +214,13 @@ module Tinder
     def upload(filename)
       File.open(filename, "rb") do |file|
         params = Multipart::MultipartPost.new('upload' => file)
-        connection.post("/room/#{@id}/uploads.json", :body => params.query)
+        post(:uploads, :body => params.query)
       end
     end
 
     # Get the list of latest files for this room
     def files(count = 5)
-      connection.get(room_url_for(:uploads))['uploads'].map { |u| u['full_url'] }
+      get(:uploads)['uploads'].map { |u| u['full_url'] }
     end
 
     protected
@@ -193,11 +237,15 @@ module Tinder
         @full = attributes['full']
         @open_to_guests = attributes['open_to_guests']
         @active_token_value = attributes['active_token_value']
+<<<<<<< HEAD
         @users ={}
         attributes['users'].map do |u|
           @users[u['id']] = u;
         end
 
+=======
+        @users = attributes['users']
+>>>>>>> a0e99d64c9339329cf27178a9d1c1b02485c9356
 
         @loaded = true
       end
@@ -219,7 +267,7 @@ module Tinder
       end
 
       def connection
-        @campfire.connection
+        @connection
       end
   end
 end

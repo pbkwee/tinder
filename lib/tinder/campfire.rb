@@ -2,8 +2,7 @@ module Tinder
 
   # == Usage
   #
-  #   campfire = Tinder::Campfire.new 'mysubdomain'
-  #   campfire.login 'myemail@example.com', 'mypassword'
+  #   campfire = Tinder::Campfire.new 'mysubdomain', :token => 'xyz'
   #
   #   room = campfire.create_room 'New Room', 'My new campfire room to test tinder'
   #   room.speak 'Hello world!'
@@ -12,9 +11,7 @@ module Tinder
   #   room = campfire.find_room_by_guest_hash 'abc123', 'John Doe'
   #   room.speak 'Hello world!'
   class Campfire
-    HOST = "campfirenow.com"
-
-    attr_reader :connection, :subdomain, :uri
+    attr_reader :connection
 
     # Create a new connection to the campfire account with the given +subdomain+.
     #
@@ -25,42 +22,14 @@ module Tinder
     #
     #   c = Tinder::Campfire.new("mysubdomain", :ssl => true)
     def initialize(subdomain, options = {})
-      options = { :ssl => false }.merge(options)
-      @connection = Connection.new
-      @cookie = nil
-      @subdomain = subdomain
-      @uri = URI.parse("#{options[:ssl] ? 'https' : 'http' }://#{subdomain}.#{HOST}")
-      connection.base_uri @uri.to_s
-      if options[:proxy]
-        uri = URI.parse(options[:proxy])
-        @http = Net::HTTP::Proxy(uri.host, uri.port, uri.user, uri.password)
-      else
-        @http = Net::HTTP
-      end
-      @logged_in = false
-    end
-
-    # Log in to campfire using your +email+ and +password+
-    def login(username, password)
-      connection.basic_auth(username, password)
-      @logged_in = true
-    end
-
-    # Returns true when successfully logged in
-    def logged_in?
-      @logged_in == true
-    end
-
-    def logout
-      connection.default_options.delete(:basic_auth)
-      @logged_in = false
+      @connection = Connection.new(subdomain, options)
     end
 
     # Get an array of all the available rooms
     # TODO: detect rooms that are full (no link)
     def rooms
       connection.get('/rooms.json')['rooms'].map do |room|
-        Room.new(self, room)
+        Room.new(connection, room)
       end
     end
 
@@ -85,22 +54,13 @@ module Tinder
     end
 
     # List the users that are currently chatting in any room
-    def users(*room_names)
-      rooms.map(&:users).flatten.compact.uniq.sort
+    def users
+      rooms.map(&:users).flatten.compact.uniq.sort_by {|u| u[:name]}
     end
 
-    # Get the dates of the available transcripts by room
-    #
-    #   campfire.available_transcripts
-    #   #=> {"15840" => [#<Date: 4908311/2,0,2299161>, #<Date: 4908285/2,0,2299161>]}
-    #
-    def available_transcripts(room = nil)
-      raise NotImplementedError
-    end
-
-    # Is the connection to campfire using ssl?
-    def ssl?
-      uri.scheme == 'https'
+    # get the user info of the current user
+    def me
+      connection.get("/users/me.json")["user"]
     end
   end
 end
