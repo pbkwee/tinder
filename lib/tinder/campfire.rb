@@ -1,3 +1,4 @@
+# encoding: UTF-8
 module Tinder
 
   # == Usage
@@ -17,7 +18,9 @@ module Tinder
     #
     # == Options:
     # * +:ssl+: use SSL for the connection, which is required if you have a Campfire SSL account.
-    #           Defaults to false
+    #           Defaults to true
+    # * +:ssl_options+: SSL options passed to the underlaying Faraday connection. Allows to specify if the SSL certificate should be verified (:verify => true|false) and to specify the path to the ssl certs directory (:ca_path => "path/certs")
+    #           Defaults to {:verify => true}
     # * +:proxy+: a proxy URI. (e.g. :proxy => 'http://user:pass@example.com:8000')
     #
     #   c = Tinder::Campfire.new("mysubdomain", :ssl => true)
@@ -33,6 +36,13 @@ module Tinder
       end
     end
 
+    # Find a campfire room by id
+    # NOTE: id should be of type Integer
+    def find_room_by_id(id)
+      id = id.to_i
+      rooms.detect { |room| room.id == id }
+    end
+
     # Find a campfire room by name
     def find_room_by_name(name)
       rooms.detect { |room| room.name == name }
@@ -45,7 +55,7 @@ module Tinder
 
     # Creates and returns a new Room with the given +name+ and optionally a +topic+
     def create_room(name, topic = nil)
-      connection.post('/rooms.json', :body => { :room => { :name => name, :topic => topic } }.to_json)
+      connection.post('/rooms.json', { :room => { :name => name, :topic => topic } })
       find_room_by_name(name)
     end
 
